@@ -1,6 +1,12 @@
+<div align="center">
+
+  [![Build with Ona](https://ona.com/build-with-ona.svg)](https://app.ona.com/#https://github.com/jespino/gopgsql)
+
 # gopgsql
 
 A hand-written PostgreSQL SQL parser in Go. No code generation, no grammar files — just a recursive-descent scanner and parser modeled after the Go compiler's architecture.
+
+</div>
 
 Produces an AST equivalent to PostgreSQL's internal parse tree (`parsenodes.h`).
 
