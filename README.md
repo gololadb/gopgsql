@@ -4,7 +4,7 @@
 
 # gopgsql
 
-A hand-written PostgreSQL SQL parser in Go. No code generation, no grammar files — just a recursive-descent scanner and parser modeled after the Go compiler's architecture.
+A PostgreSQL SQL parser in pure Go. No generated code, no grammar files, no flex/bison — just a recursive-descent scanner and parser modeled after the Go compiler's architecture.
 
 </div>
 
@@ -150,9 +150,9 @@ go test ./...
 The parser follows the Go compiler's scanner/parser architecture:
 
 - **Scanner** (`scanner/`) reads UTF-8 source one rune at a time, producing tokens. Handles PostgreSQL-specific lexical elements: dollar-quoted strings, Unicode escapes (`U&'...'`), bit-string literals, operator classification, and the full keyword table.
-- **Parser** (`parser/`) is a hand-written recursive-descent parser using precedence climbing for expressions. No parser generator — each grammar production is a Go function. The AST node types mirror PostgreSQL's `parsenodes.h` naming conventions.
+- **Parser** (`parser/`) is a recursive-descent parser using precedence climbing for expressions. No parser generator — each grammar production is a Go function. The AST node types mirror PostgreSQL's `parsenodes.h` naming conventions.
 
-### Why hand-written?
+### Why not flex/bison?
 
 - Full control over error recovery and error messages
 - No build-time dependencies on parser generators
