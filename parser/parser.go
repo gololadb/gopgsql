@@ -22,6 +22,12 @@ type Parser struct {
 	kind  LitKind
 	kwcat KeywordCategory
 	pos   int // byte offset of current token
+
+	// inColDefault is set while parsing a DEFAULT expression inside a
+	// column constraint list. It tells parseExprPrec to stop when it
+	// sees NOT (which starts the next constraint, e.g. NOT NULL) rather
+	// than trying to parse NOT as an expression operator.
+	inColDefault bool
 }
 
 // Parse parses the SQL source and returns a list of raw statements.

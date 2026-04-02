@@ -294,6 +294,10 @@ func (p *Parser) parseExprSuffix(left Expr, minPrec int) Expr {
 
 		// NOT (BETWEEN, IN, LIKE, ILIKE, SIMILAR)
 		if p.isKeyword("not") && minPrec <= precBetween {
+			// In column-constraint context, NOT NULL is a constraint, not an operator.
+			if p.inColDefault {
+				break
+			}
 			pos := p.pos
 			p.next()
 			if p.isKeyword("between") {

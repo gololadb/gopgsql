@@ -491,7 +491,9 @@ func (p *Parser) parseColConstraintElem() *Constraint {
 
 	case p.isKeyword("default"):
 		p.next()
+		p.inColDefault = true
 		expr := p.parseExpr()
+		p.inColDefault = false
 		return &Constraint{baseNode: baseNode{pos}, Contype: CONSTR_DEFAULT, RawExpr: expr}
 
 	case p.isKeyword("check"):
