@@ -120,6 +120,7 @@ type Value struct {
 	Type ValType
 	Ival int64
 	Str  string
+	Bool bool
 }
 
 type ValType int
@@ -130,6 +131,7 @@ const (
 	ValStr                  // string
 	ValBitStr               // bit string
 	ValNull                 // NULL
+	ValBool                 // boolean (true/false)
 )
 
 // TypeCast represents expr::type.
@@ -761,13 +763,34 @@ const (
 // CreateStmt represents CREATE TABLE.
 type CreateStmt struct {
 	baseStmt
-	Relation    *RangeVar
-	TableElts   []Node       // list of ColumnDef, Constraint
-	InhRelations []Node      // INHERITS list (RangeVar)
-	IfNotExists bool
-	Persistence RelPersistence // TEMP, UNLOGGED, or permanent
-	OnCommit    OnCommitAction
+	Relation      *RangeVar
+	TableElts     []Node       // list of ColumnDef, Constraint
+	InhRelations  []Node       // INHERITS list (RangeVar)
+	IfNotExists   bool
+	Persistence   RelPersistence // TEMP, UNLOGGED, or permanent
+	OnCommit      OnCommitAction
+	PartitionSpec *PartitionSpec // PARTITION BY clause, or nil
 }
+
+// PartitionSpec represents a PARTITION BY clause.
+type PartitionSpec struct {
+	baseNode
+	Strategy string          // "range", "list", or "hash"
+	PartParams []*PartitionElem // partition key columns/expressions
+}
+
+func (*PartitionSpec) node() {}
+
+// PartitionElem represents a single partition key element.
+type PartitionElem struct {
+	baseNode
+	Name     string   // column name (empty if expression)
+	Expr     Expr     // expression (nil if column name)
+	Collation []string // COLLATE clause
+	OpClass  []string // operator class
+}
+
+func (*PartitionElem) node() {}
 
 // CreateTableAsStmt represents CREATE TABLE ... AS SELECT.
 type CreateTableAsStmt struct {

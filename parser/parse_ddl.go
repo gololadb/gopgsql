@@ -1,5 +1,7 @@
 package parser
 
+import "strings"
+
 // parseCreateStmt dispatches CREATE TABLE, CREATE TABLE AS, etc.
 func (p *Parser) parseCreateStmt() Stmt {
 	p.wantKeyword("create")
@@ -285,6 +287,11 @@ func (p *Parser) parseCreateTable(persistence RelPersistence) Stmt {
 		p.wantSelf(')')
 	}
 
+	// PARTITION BY { RANGE | LIST | HASH } (partition_elem, ...)
+	if p.isKeyword("partition") {
+		cs.PartitionSpec = p.parsePartitionSpec()
+	}
+
 	// ON COMMIT { PRESERVE ROWS | DELETE ROWS | DROP }
 	if p.isKeyword("on") {
 		p.next()
@@ -330,6 +337,69 @@ func (p *Parser) parseCreateTableAs(rel *RangeVar, persistence RelPersistence, i
 		Persistence: persistence,
 		WithData:    withData,
 	}
+}
+
+// parsePartitionSpec parses: PARTITION BY { RANGE | LIST | HASH } ( partition_elem, ... )
+func (p *Parser) parsePartitionSpec() *PartitionSpec {
+	pos := p.pos
+	p.wantKeyword("partition")
+	p.wantKeyword("by")
+
+	spec := &PartitionSpec{baseNode: baseNode{pos}}
+
+	// RANGE is a keyword, but LIST and HASH are plain identifiers in
+	// PostgreSQL's grammar, so match on the literal text.
+	switch strings.ToLower(p.lit) {
+	case "range", "list", "hash":
+		spec.Strategy = strings.ToLower(p.lit)
+		p.next()
+	default:
+		p.syntaxError("expected RANGE, LIST, or HASH")
+		return spec
+	}
+
+	p.wantSelf('(')
+	for {
+		spec.PartParams = append(spec.PartParams, p.parsePartitionElem())
+		if !p.gotSelf(',') {
+			break
+		}
+	}
+	p.wantSelf(')')
+
+	return spec
+}
+
+// parsePartitionElem parses a single partition key element:
+//   column_name [COLLATE collation] [opclass]
+//   ( expression ) [COLLATE collation] [opclass]
+func (p *Parser) parsePartitionElem() *PartitionElem {
+	pos := p.pos
+	elem := &PartitionElem{baseNode: baseNode{pos}}
+
+	if p.tok == Token('(') {
+		// Expression in parentheses.
+		p.next()
+		elem.Expr = p.parseExpr()
+		p.wantSelf(')')
+	} else {
+		// Column name.
+		elem.Name = p.colId()
+	}
+
+	// Optional COLLATE collation.
+	if p.gotKeyword("collate") {
+		elem.Collation = p.parseQualifiedName()
+	}
+
+	// Optional operator class (an identifier, possibly qualified).
+	// Only consume if the next token looks like an identifier and not
+	// a keyword that ends the partition element list.
+	if p.tok == IDENT && !p.isAnyKeyword(")", ",") {
+		elem.OpClass = p.parseQualifiedName()
+	}
+
+	return elem
 }
 
 // parseTableElementList parses a comma-separated list of column defs and table constraints.

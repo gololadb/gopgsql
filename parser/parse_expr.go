@@ -894,11 +894,11 @@ func (p *Parser) parsePrimaryExpr() Expr {
 	// TRUE / FALSE
 	if p.isKeyword("true") {
 		p.next()
-		return &A_Const{baseExpr: baseExpr{baseNode{pos}}, Val: Value{Type: ValStr, Str: "t"}}
+		return &A_Const{baseExpr: baseExpr{baseNode{pos}}, Val: Value{Type: ValBool, Bool: true}}
 	}
 	if p.isKeyword("false") {
 		p.next()
-		return &A_Const{baseExpr: baseExpr{baseNode{pos}}, Val: Value{Type: ValStr, Str: "f"}}
+		return &A_Const{baseExpr: baseExpr{baseNode{pos}}, Val: Value{Type: ValBool, Bool: false}}
 	}
 
 	// Integer literal

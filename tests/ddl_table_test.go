@@ -293,3 +293,89 @@ func TestCreateUnloggedTable(t *testing.T) {
 		t.Errorf("expected UNLOGGED, got %d", cs.Persistence)
 	}
 }
+
+func TestCreateTablePartitionByRange(t *testing.T) {
+	sql := `CREATE TABLE measurement (
+		city_id int NOT NULL,
+		logdate date NOT NULL,
+		peaktemp int
+	) PARTITION BY RANGE (logdate)`
+	s := parseOne(t, sql)
+	cs := s.(*parser.CreateStmt)
+	if cs.PartitionSpec == nil {
+		t.Fatal("expected PartitionSpec")
+	}
+	if cs.PartitionSpec.Strategy != "range" {
+		t.Errorf("expected strategy 'range', got %q", cs.PartitionSpec.Strategy)
+	}
+	if len(cs.PartitionSpec.PartParams) != 1 {
+		t.Fatalf("expected 1 partition param, got %d", len(cs.PartitionSpec.PartParams))
+	}
+	if cs.PartitionSpec.PartParams[0].Name != "logdate" {
+		t.Errorf("expected partition column 'logdate', got %q", cs.PartitionSpec.PartParams[0].Name)
+	}
+}
+
+func TestCreateTablePartitionByList(t *testing.T) {
+	sql := `CREATE TABLE cities (
+		city_id int NOT NULL,
+		name text
+	) PARTITION BY LIST (city_id)`
+	s := parseOne(t, sql)
+	cs := s.(*parser.CreateStmt)
+	if cs.PartitionSpec == nil {
+		t.Fatal("expected PartitionSpec")
+	}
+	if cs.PartitionSpec.Strategy != "list" {
+		t.Errorf("expected strategy 'list', got %q", cs.PartitionSpec.Strategy)
+	}
+}
+
+func TestCreateTablePartitionByHash(t *testing.T) {
+	sql := `CREATE TABLE orders (
+		order_id bigint NOT NULL,
+		order_date date
+	) PARTITION BY HASH (order_id)`
+	s := parseOne(t, sql)
+	cs := s.(*parser.CreateStmt)
+	if cs.PartitionSpec == nil {
+		t.Fatal("expected PartitionSpec")
+	}
+	if cs.PartitionSpec.Strategy != "hash" {
+		t.Errorf("expected strategy 'hash', got %q", cs.PartitionSpec.Strategy)
+	}
+}
+
+func TestCreateTablePartitionByMultipleColumns(t *testing.T) {
+	sql := `CREATE TABLE t (a int, b int, c text) PARTITION BY RANGE (a, b)`
+	s := parseOne(t, sql)
+	cs := s.(*parser.CreateStmt)
+	if cs.PartitionSpec == nil {
+		t.Fatal("expected PartitionSpec")
+	}
+	if len(cs.PartitionSpec.PartParams) != 2 {
+		t.Fatalf("expected 2 partition params, got %d", len(cs.PartitionSpec.PartParams))
+	}
+	if cs.PartitionSpec.PartParams[0].Name != "a" {
+		t.Errorf("expected first param 'a', got %q", cs.PartitionSpec.PartParams[0].Name)
+	}
+	if cs.PartitionSpec.PartParams[1].Name != "b" {
+		t.Errorf("expected second param 'b', got %q", cs.PartitionSpec.PartParams[1].Name)
+	}
+}
+
+func TestCreateTablePartitionByExpression(t *testing.T) {
+	sql := `CREATE TABLE t (created_at timestamptz) PARTITION BY RANGE ((created_at::date))`
+	s := parseOne(t, sql)
+	cs := s.(*parser.CreateStmt)
+	if cs.PartitionSpec == nil {
+		t.Fatal("expected PartitionSpec")
+	}
+	if len(cs.PartitionSpec.PartParams) != 1 {
+		t.Fatalf("expected 1 partition param, got %d", len(cs.PartitionSpec.PartParams))
+	}
+	if cs.PartitionSpec.PartParams[0].Expr == nil {
+		t.Fatal("expected expression partition element")
+	}
+}
+

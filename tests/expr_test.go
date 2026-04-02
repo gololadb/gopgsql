@@ -778,6 +778,48 @@ func TestSubqueryIndirectionChained(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Boolean literals
+// ---------------------------------------------------------------------------
+
+func TestBooleanLiteralTrue(t *testing.T) {
+	stmt := parseOne(t, "SELECT TRUE")
+	sel := stmt.(*parser.SelectStmt)
+	c, ok := sel.TargetList[0].Val.(*parser.A_Const)
+	if !ok {
+		t.Fatalf("expected *parser.A_Const, got %T", sel.TargetList[0].Val)
+	}
+	if c.Val.Type != parser.ValBool {
+		t.Fatalf("expected ValBool, got %d", c.Val.Type)
+	}
+	if !c.Val.Bool {
+		t.Fatal("expected Bool=true")
+	}
+}
+
+func TestBooleanLiteralFalse(t *testing.T) {
+	stmt := parseOne(t, "SELECT FALSE")
+	sel := stmt.(*parser.SelectStmt)
+	c, ok := sel.TargetList[0].Val.(*parser.A_Const)
+	if !ok {
+		t.Fatalf("expected *parser.A_Const, got %T", sel.TargetList[0].Val)
+	}
+	if c.Val.Type != parser.ValBool {
+		t.Fatalf("expected ValBool, got %d", c.Val.Type)
+	}
+	if c.Val.Bool {
+		t.Fatal("expected Bool=false")
+	}
+}
+
+func TestBooleanInWhere(t *testing.T) {
+	stmt := parseOne(t, "SELECT * FROM t WHERE active = TRUE AND deleted = FALSE")
+	sel := stmt.(*parser.SelectStmt)
+	if sel.WhereClause == nil {
+		t.Fatal("expected WHERE clause")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Column-level GRANT
 // ---------------------------------------------------------------------------
 
