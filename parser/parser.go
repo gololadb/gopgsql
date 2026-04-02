@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jespino/gopgsql/scanner"
+	"github.com/gololadb/gopgsql/scanner"
 )
 
 // Parser is a recursive-descent parser for PostgreSQL SQL.

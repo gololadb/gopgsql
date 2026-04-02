@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jespino/gopgsql/parser"
+	"github.com/gololadb/gopgsql/parser"
 )
 
 func TestMultiStatement(t *testing.T) {

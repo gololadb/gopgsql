@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jespino/gopgsql/parser"
+	"github.com/gololadb/gopgsql/parser"
 )
 
 func parseOne(t *testing.T, sql string) parser.Stmt {

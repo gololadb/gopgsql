@@ -3,7 +3,7 @@ package parser
 // Re-export scanner types so parser files can use them unqualified.
 // This avoids adding an import to every file in the package.
 
-import "github.com/jespino/gopgsql/scanner"
+import "github.com/gololadb/gopgsql/scanner"
 
 // Type aliases
 type Token = scanner.Token

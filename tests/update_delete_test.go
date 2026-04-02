@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/jespino/gopgsql/parser"
+	"github.com/gololadb/gopgsql/parser"
 )
 
 func TestUpdateSimple(t *testing.T) {
