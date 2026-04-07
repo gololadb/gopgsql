@@ -396,6 +396,30 @@ func TestAlterTableIfExists(t *testing.T) {
 }
 
 
+func TestAlterTableOnly(t *testing.T) {
+	s := parseOne(t, "ALTER TABLE ONLY t ADD COLUMN col integer")
+	alt := s.(*parser.AlterTableStmt)
+	if alt.Relation.Inh {
+		t.Error("expected Inh=false for ONLY")
+	}
+	if alt.Relation.Relname != "t" {
+		t.Errorf("expected relname 't', got %q", alt.Relation.Relname)
+	}
+}
+
+
+func TestAlterTableIfExistsOnly(t *testing.T) {
+	s := parseOne(t, "ALTER TABLE IF EXISTS ONLY t DROP COLUMN col")
+	alt := s.(*parser.AlterTableStmt)
+	if !alt.MissingOk {
+		t.Error("expected MissingOk=true")
+	}
+	if alt.Relation.Inh {
+		t.Error("expected Inh=false for ONLY")
+	}
+}
+
+
 func TestAlterTableMultipleCmds(t *testing.T) {
 	s := parseOne(t, "ALTER TABLE t ADD COLUMN a integer, ADD COLUMN b text")
 	alt := s.(*parser.AlterTableStmt)

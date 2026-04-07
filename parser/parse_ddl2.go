@@ -161,7 +161,13 @@ func (p *Parser) parseAlterTableStmt() *AlterTableStmt {
 		stmt.MissingOk = true
 	}
 
+	inh := true
+	if p.gotKeyword("only") {
+		inh = false
+	}
+
 	stmt.Relation = p.parseRangeVar()
+	stmt.Relation.Inh = inh
 
 	if p.isKeyword("rename") {
 		return p.parseAlterTableRename(stmt)
