@@ -165,6 +165,35 @@ func TestAlterSchema(t *testing.T) {
 	}
 }
 
+func TestAlterAggregate(t *testing.T) {
+	tests := []struct {
+		sql  string
+		desc string
+	}{
+		{"ALTER AGGREGATE public.group_concat(text) OWNER TO postgres", "owner to"},
+		{"ALTER AGGREGATE myagg(integer) RENAME TO newagg", "rename to"},
+		{"ALTER AGGREGATE myagg(integer) SET SCHEMA newschema", "set schema"},
+		{"ALTER AGGREGATE myagg(*) OWNER TO alice", "star arg owner"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			stmt := parseOne(t, tt.sql)
+			switch s := stmt.(type) {
+			case *parser.AlterOwnerStmt:
+				if s.NewOwner == "" {
+					t.Fatal("expected non-empty NewOwner")
+				}
+			case *parser.RenameStmt:
+				if s.Newname == "" {
+					t.Fatal("expected non-empty Newname")
+				}
+			default:
+				t.Fatalf("unexpected type %T", stmt)
+			}
+		})
+	}
+}
+
 func TestAlterTypeOwner(t *testing.T) {
 	tests := []struct {
 		sql  string

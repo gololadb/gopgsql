@@ -142,6 +142,8 @@ func (p *Parser) parseAlterStmt() Stmt {
 		return p.parseAlterStatistics()
 	case p.isKeyword("schema"):
 		return p.parseAlterSchema()
+	case p.isKeyword("aggregate"):
+		return p.parseAlterAggregate()
 	default:
 		p.syntaxError("expected object type after ALTER")
 		p.next()

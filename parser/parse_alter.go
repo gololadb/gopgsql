@@ -554,6 +554,66 @@ func (p *Parser) parseAlterFuncArg() *TypeName {
 	return p.parseTypeName()
 }
 
+// parseAlterAggregate parses ALTER AGGREGATE name (args) OWNER TO | RENAME TO | SET SCHEMA.
+func (p *Parser) parseAlterAggregate() Stmt {
+	p.wantKeyword("aggregate")
+	pos := p.pos
+	name := p.parseQualifiedName()
+
+	// Parse argument types
+	var args []*TypeName
+	if p.gotSelf('(') {
+		if p.tok != Token(')') {
+			// Handle ORDER BY aggregate syntax: (*) or (type, ...)
+			if p.tok == Token('*') {
+				p.next() // consume *
+			} else {
+				args = append(args, p.parseAlterFuncArg())
+				for p.gotSelf(',') {
+					args = append(args, p.parseAlterFuncArg())
+				}
+			}
+		}
+		p.wantSelf(')')
+	}
+
+	switch {
+	case p.isKeyword("owner"):
+		p.next()
+		p.wantKeyword("to")
+		return &AlterOwnerStmt{
+			baseStmt:   baseStmt{baseNode{pos}},
+			ObjectType: OBJECT_AGGREGATE,
+			Object:     name,
+			NewOwner:   p.colId(),
+		}
+	case p.isKeyword("rename"):
+		p.next()
+		p.wantKeyword("to")
+		return &RenameStmt{
+			baseStmt:   baseStmt{baseNode{pos}},
+			RenameType: OBJECT_AGGREGATE,
+			Subname:    joinName(name),
+			Newname:    p.colId(),
+		}
+	case p.isKeyword("set"):
+		p.next()
+		if p.gotKeyword("schema") {
+			return &RenameStmt{
+				baseStmt:   baseStmt{baseNode{pos}},
+				RenameType: OBJECT_AGGREGATE,
+				Subname:    joinName(name),
+				Newname:    p.colId(),
+			}
+		}
+		p.syntaxError("expected SCHEMA after ALTER AGGREGATE name (...) SET")
+		return nil
+	default:
+		p.syntaxError("expected OWNER, RENAME, or SET after ALTER AGGREGATE name (...)")
+		return nil
+	}
+}
+
 // parseAlterSchema parses ALTER SCHEMA name RENAME TO | OWNER TO.
 func (p *Parser) parseAlterSchema() Stmt {
 	p.wantKeyword("schema")
