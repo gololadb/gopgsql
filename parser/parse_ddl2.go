@@ -140,6 +140,8 @@ func (p *Parser) parseAlterStmt() Stmt {
 		return p.parseAlterDefaultPrivileges()
 	case p.isKeyword("statistics"):
 		return p.parseAlterStatistics()
+	case p.isKeyword("schema"):
+		return p.parseAlterSchema()
 	default:
 		p.syntaxError("expected object type after ALTER")
 		p.next()

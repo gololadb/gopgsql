@@ -90,6 +90,138 @@ func TestAlterDomainStmt(t *testing.T) {
 }
 
 
+func TestAlterDomainOwner(t *testing.T) {
+	tests := []struct {
+		sql  string
+		desc string
+	}{
+		{`ALTER DOMAIN public."bigint" OWNER TO postgres`, "owner to"},
+		{"ALTER DOMAIN mydom RENAME TO newdom", "rename to"},
+		{"ALTER DOMAIN mydom SET SCHEMA newschema", "set schema"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			stmt := parseOne(t, tt.sql)
+			switch tt.desc {
+			case "owner to":
+				ao, ok := stmt.(*parser.AlterOwnerStmt)
+				if !ok {
+					t.Fatalf("expected *parser.AlterOwnerStmt, got %T", stmt)
+				}
+				if ao.NewOwner != "postgres" {
+					t.Fatalf("expected 'postgres', got %q", ao.NewOwner)
+				}
+			case "rename to":
+				rs, ok := stmt.(*parser.RenameStmt)
+				if !ok {
+					t.Fatalf("expected *parser.RenameStmt, got %T", stmt)
+				}
+				if rs.Newname != "newdom" {
+					t.Fatalf("expected 'newdom', got %q", rs.Newname)
+				}
+			case "set schema":
+				rs, ok := stmt.(*parser.RenameStmt)
+				if !ok {
+					t.Fatalf("expected *parser.RenameStmt, got %T", stmt)
+				}
+				if rs.Newname != "newschema" {
+					t.Fatalf("expected 'newschema', got %q", rs.Newname)
+				}
+			}
+		})
+	}
+}
+
+func TestAlterSchema(t *testing.T) {
+	tests := []struct {
+		sql  string
+		desc string
+	}{
+		{"ALTER SCHEMA public OWNER TO postgres", "owner to"},
+		{"ALTER SCHEMA myschema RENAME TO newschema", "rename to"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			stmt := parseOne(t, tt.sql)
+			switch tt.desc {
+			case "owner to":
+				ao, ok := stmt.(*parser.AlterOwnerStmt)
+				if !ok {
+					t.Fatalf("expected *parser.AlterOwnerStmt, got %T", stmt)
+				}
+				if ao.NewOwner != "postgres" {
+					t.Fatalf("expected 'postgres', got %q", ao.NewOwner)
+				}
+			case "rename to":
+				rs, ok := stmt.(*parser.RenameStmt)
+				if !ok {
+					t.Fatalf("expected *parser.RenameStmt, got %T", stmt)
+				}
+				if rs.Newname != "newschema" {
+					t.Fatalf("expected 'newschema', got %q", rs.Newname)
+				}
+			}
+		})
+	}
+}
+
+func TestAlterTypeOwner(t *testing.T) {
+	tests := []struct {
+		sql  string
+		desc string
+	}{
+		{"ALTER TYPE public.mpaa_rating OWNER TO postgres", "owner to"},
+		{"ALTER TYPE mytype SET SCHEMA newschema", "set schema"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			stmt := parseOne(t, tt.sql)
+			switch tt.desc {
+			case "owner to":
+				ao, ok := stmt.(*parser.AlterOwnerStmt)
+				if !ok {
+					t.Fatalf("expected *parser.AlterOwnerStmt, got %T", stmt)
+				}
+				if ao.NewOwner != "postgres" {
+					t.Fatalf("expected 'postgres', got %q", ao.NewOwner)
+				}
+			case "set schema":
+				rs, ok := stmt.(*parser.RenameStmt)
+				if !ok {
+					t.Fatalf("expected *parser.RenameStmt, got %T", stmt)
+				}
+				if rs.Newname != "newschema" {
+					t.Fatalf("expected 'newschema', got %q", rs.Newname)
+				}
+			}
+		})
+	}
+}
+
+func TestAlterFunctionNamedParams(t *testing.T) {
+	tests := []struct {
+		sql  string
+		desc string
+	}{
+		{"ALTER FUNCTION public.film_in_stock(p_film_id integer, p_store_id integer) OWNER TO postgres", "named params"},
+		{"ALTER FUNCTION public.inventory_held_by_customer(p_inventory_id integer) OWNER TO postgres", "single named param"},
+		{"ALTER FUNCTION myfunc(IN p_id integer, OUT result text) OWNER TO alice", "with modes"},
+		{"ALTER FUNCTION myfunc(integer, text) OWNER TO alice", "bare types"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			stmt := parseOne(t, tt.sql)
+			af, ok := stmt.(*parser.AlterFunctionStmt)
+			if !ok {
+				t.Fatalf("expected *parser.AlterFunctionStmt, got %T", stmt)
+			}
+			if af.Func == nil {
+				t.Fatal("expected non-nil Func")
+			}
+		})
+	}
+}
+
 func TestAlterEnumType(t *testing.T) {
 	tests := []struct {
 		sql  string

@@ -31,12 +31,36 @@ func (p *Parser) parseAlterRole() Stmt {
 }
 
 // parseAlterDomain parses ALTER DOMAIN name action.
-func (p *Parser) parseAlterDomain() *AlterDomainStmt {
+func (p *Parser) parseAlterDomain() Stmt {
 	p.wantKeyword("domain")
 	pos := p.pos
 
+	typeName := p.parseQualifiedName()
+
+	// Handle OWNER TO, SET SCHEMA, RENAME TO via generic stmts
+	switch {
+	case p.isKeyword("owner"):
+		p.next()
+		p.wantKeyword("to")
+		return &AlterOwnerStmt{
+			baseStmt:   baseStmt{baseNode{pos}},
+			ObjectType: OBJECT_DOMAIN,
+			Object:     typeName,
+			NewOwner:   p.colId(),
+		}
+	case p.isKeyword("rename"):
+		p.next()
+		p.wantKeyword("to")
+		return &RenameStmt{
+			baseStmt:   baseStmt{baseNode{pos}},
+			RenameType: OBJECT_DOMAIN,
+			Subname:    joinName(typeName),
+			Newname:    p.colId(),
+		}
+	}
+
 	ad := &AlterDomainStmt{baseStmt: baseStmt{baseNode{pos}}}
-	ad.TypeName = p.parseQualifiedName()
+	ad.TypeName = typeName
 
 	switch {
 	case p.isKeyword("set"):
@@ -47,8 +71,15 @@ func (p *Parser) parseAlterDomain() *AlterDomainStmt {
 		} else if p.gotKeyword("default") {
 			ad.Subtype = 'T' // SET DEFAULT
 			ad.Def = p.parseExpr()
+		} else if p.gotKeyword("schema") {
+			return &RenameStmt{
+				baseStmt:   baseStmt{baseNode{pos}},
+				RenameType: OBJECT_DOMAIN,
+				Subname:    joinName(typeName),
+				Newname:    p.colId(),
+			}
 		} else {
-			p.syntaxError("expected NOT NULL or DEFAULT after SET")
+			p.syntaxError("expected NOT NULL, DEFAULT, or SCHEMA after SET")
 		}
 	case p.isKeyword("drop"):
 		p.next()
@@ -76,7 +107,7 @@ func (p *Parser) parseAlterDomain() *AlterDomainStmt {
 		ad.Subtype = 'V'
 		ad.Name = p.colId()
 	default:
-		p.syntaxError("expected SET, DROP, ADD, or VALIDATE after ALTER DOMAIN name")
+		p.syntaxError("expected SET, DROP, ADD, VALIDATE, OWNER, or RENAME after ALTER DOMAIN name")
 	}
 
 	return ad
@@ -146,8 +177,32 @@ func (p *Parser) parseAlterType() Stmt {
 			baseStmt: baseStmt{baseNode{pos}},
 			TypeName: typeName,
 		}
+	case p.isKeyword("owner"):
+		p.next()
+		p.wantKeyword("to")
+		return &AlterOwnerStmt{
+			baseStmt:   baseStmt{baseNode{pos}},
+			ObjectType: OBJECT_TYPE,
+			Object:     typeName,
+			NewOwner:   p.colId(),
+		}
+	case p.isKeyword("set"):
+		p.next()
+		if p.gotKeyword("schema") {
+			return &RenameStmt{
+				baseStmt:   baseStmt{baseNode{pos}},
+				RenameType: OBJECT_TYPE,
+				Subname:    joinName(typeName),
+				Newname:    p.colId(),
+			}
+		}
+		// Generic ALTER TYPE SET ...
+		return &AlterTypeStmt{
+			baseStmt: baseStmt{baseNode{pos}},
+			TypeName: typeName,
+		}
 	default:
-		// Generic ALTER TYPE (SET SCHEMA, OWNER TO, etc.)
+		// Generic ALTER TYPE
 		return &AlterTypeStmt{
 			baseStmt: baseStmt{baseNode{pos}},
 			TypeName: typeName,
@@ -175,9 +230,9 @@ func (p *Parser) parseAlterFunction() *AlterFunctionStmt {
 	// Parse argument types if present
 	if p.gotSelf('(') {
 		if p.tok != Token(')') {
-			af.Func.Funcargs = append(af.Func.Funcargs, p.parseTypeName())
+			af.Func.Funcargs = append(af.Func.Funcargs, p.parseAlterFuncArg())
 			for p.gotSelf(',') {
-				af.Func.Funcargs = append(af.Func.Funcargs, p.parseTypeName())
+				af.Func.Funcargs = append(af.Func.Funcargs, p.parseAlterFuncArg())
 			}
 		}
 		p.wantSelf(')')
@@ -460,6 +515,74 @@ func (p *Parser) parseAlterEventTrigger() *AlterEventTrigStmt {
 	}
 
 	return ae
+}
+
+// parseAlterFuncArg parses a single function argument in ALTER FUNCTION context:
+// [IN|OUT|INOUT|VARIADIC] [name] type
+// Returns only the type, since ALTER FUNCTION signatures only need types for matching.
+func (p *Parser) parseAlterFuncArg() *TypeName {
+	// Skip optional mode keyword
+	if p.isAnyKeyword("in", "out", "inout", "variadic") {
+		if p.isKeyword("in") {
+			p.next()
+			p.gotKeyword("out") // handle IN OUT as INOUT
+		} else {
+			p.next()
+		}
+	}
+
+	// Skip optional parameter name: if we see an identifier followed by a type,
+	// the first identifier is the parameter name.
+	if p.tok == IDENT || (p.tok == KEYWORD && p.kwcat != ReservedKeyword) {
+		if !p.isAnyKeyword("int", "integer", "smallint", "bigint", "real", "float",
+			"double", "decimal", "numeric", "boolean", "bool", "text", "varchar",
+			"character", "char", "timestamp", "time", "interval", "json", "jsonb",
+			"uuid", "xml", "bytea", "bit", "setof") {
+			// Could be a name or a user-defined type. Peek ahead.
+			savedLit := p.lit
+			savedPos := p.pos
+			p.next()
+			if p.tok == IDENT || p.tok == KEYWORD {
+				// Two identifiers: first was a name, parse the type
+				return p.parseTypeName()
+			}
+			// Single identifier: it was a type name
+			return &TypeName{baseNode: baseNode{savedPos}, Names: []string{savedLit}}
+		}
+	}
+
+	return p.parseTypeName()
+}
+
+// parseAlterSchema parses ALTER SCHEMA name RENAME TO | OWNER TO.
+func (p *Parser) parseAlterSchema() Stmt {
+	p.wantKeyword("schema")
+	pos := p.pos
+	name := p.colId()
+
+	switch {
+	case p.isKeyword("rename"):
+		p.next()
+		p.wantKeyword("to")
+		return &RenameStmt{
+			baseStmt:   baseStmt{baseNode{pos}},
+			RenameType: OBJECT_SCHEMA,
+			Subname:    name,
+			Newname:    p.colId(),
+		}
+	case p.isKeyword("owner"):
+		p.next()
+		p.wantKeyword("to")
+		return &AlterOwnerStmt{
+			baseStmt:   baseStmt{baseNode{pos}},
+			ObjectType: OBJECT_SCHEMA,
+			Object:     []string{name},
+			NewOwner:   p.colId(),
+		}
+	default:
+		p.syntaxError("expected RENAME or OWNER after ALTER SCHEMA name")
+		return nil
+	}
 }
 
 // parseAlterSystem parses ALTER SYSTEM SET/RESET config.
