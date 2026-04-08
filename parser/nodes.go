@@ -770,6 +770,8 @@ type CreateStmt struct {
 	Persistence   RelPersistence // TEMP, UNLOGGED, or permanent
 	OnCommit      OnCommitAction
 	PartitionSpec *PartitionSpec // PARTITION BY clause, or nil
+	PartitionOf   *RangeVar          // PARTITION OF parent, or nil
+	PartBound     *PartitionBoundSpec // FOR VALUES clause, or nil
 }
 
 // PartitionSpec represents a PARTITION BY clause.
@@ -791,6 +793,34 @@ type PartitionElem struct {
 }
 
 func (*PartitionElem) node() {}
+
+// PartitionBoundSpec represents partition bounds (FOR VALUES ... or DEFAULT).
+type PartitionBoundSpec struct {
+	baseNode
+	Strategy   string   // "list", "range", or ""
+	IsDefault  bool     // DEFAULT partition
+	ListValues []Expr   // FOR VALUES IN (...)
+	LowerBound []Expr   // FOR VALUES FROM (...)
+	UpperBound []Expr   // FOR VALUES TO (...)
+}
+
+func (*PartitionBoundSpec) node() {}
+
+// PartitionCmd holds the child table and optional bound for ATTACH/DETACH.
+type PartitionCmd struct {
+	baseNode
+	Name  *RangeVar          // child partition table
+	Bound *PartitionBoundSpec // partition bounds (nil for DETACH)
+}
+
+func (*PartitionCmd) node() {}
+
+// ClusterStmt represents CLUSTER [table_name [USING index_name]].
+type ClusterStmt struct {
+	baseStmt
+	Relation  *RangeVar // table to cluster, or nil for all
+	IndexName string    // index to use, or ""
+}
 
 // CreateTableAsStmt represents CREATE TABLE ... AS SELECT.
 type CreateTableAsStmt struct {
@@ -957,6 +987,8 @@ const (
 	AT_DisableRowSecurity // DISABLE ROW LEVEL SECURITY
 	AT_ForceRowSecurity   // FORCE ROW LEVEL SECURITY
 	AT_NoForceRowSecurity // NO FORCE ROW LEVEL SECURITY
+	AT_AttachPartition    // ATTACH PARTITION child FOR VALUES ...
+	AT_DetachPartition    // DETACH PARTITION child
 )
 
 // DropStmt represents DROP TABLE/INDEX/VIEW/etc.

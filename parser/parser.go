@@ -368,6 +368,8 @@ func (p *Parser) parseSimpleStmt() Stmt {
 		return p.parseLoadStmt()
 	case p.isKeyword("reindex"):
 		return p.parseReindexStmt()
+	case p.isKeyword("cluster"):
+		return p.parseClusterStmt()
 	default:
 		p.syntaxError("expected statement")
 		p.next()

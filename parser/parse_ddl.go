@@ -269,6 +269,15 @@ func (p *Parser) parseCreateTable(persistence RelPersistence) Stmt {
 		Persistence: persistence,
 	}
 
+	// CREATE TABLE child PARTITION OF parent FOR VALUES ... | DEFAULT
+	if p.isKeyword("partition") {
+		p.next() // consume "partition"
+		p.wantKeyword("of")
+		cs.PartitionOf = p.parseRangeVar()
+		cs.PartBound = p.parsePartitionBoundSpec()
+		return cs
+	}
+
 	p.wantSelf('(')
 	if p.tok != Token(')') {
 		cs.TableElts = p.parseTableElementList()
@@ -400,6 +409,58 @@ func (p *Parser) parsePartitionElem() *PartitionElem {
 	}
 
 	return elem
+}
+
+// parsePartitionBoundSpec parses FOR VALUES IN (...), FOR VALUES FROM (...) TO (...), or DEFAULT.
+func (p *Parser) parsePartitionBoundSpec() *PartitionBoundSpec {
+	pos := p.pos
+	spec := &PartitionBoundSpec{baseNode: baseNode{pos}}
+
+	// DEFAULT partition
+	if p.gotKeyword("default") {
+		spec.IsDefault = true
+		return spec
+	}
+
+	p.wantKeyword("for")
+	p.wantKeyword("values")
+
+	if p.gotKeyword("in") {
+		// LIST: FOR VALUES IN (val, val, ...)
+		spec.Strategy = "list"
+		p.wantSelf('(')
+		for {
+			spec.ListValues = append(spec.ListValues, p.parseExpr())
+			if !p.gotSelf(',') {
+				break
+			}
+		}
+		p.wantSelf(')')
+	} else if p.gotKeyword("from") {
+		// RANGE: FOR VALUES FROM (val, ...) TO (val, ...)
+		spec.Strategy = "range"
+		p.wantSelf('(')
+		for {
+			spec.LowerBound = append(spec.LowerBound, p.parseExpr())
+			if !p.gotSelf(',') {
+				break
+			}
+		}
+		p.wantSelf(')')
+		p.wantKeyword("to")
+		p.wantSelf('(')
+		for {
+			spec.UpperBound = append(spec.UpperBound, p.parseExpr())
+			if !p.gotSelf(',') {
+				break
+			}
+		}
+		p.wantSelf(')')
+	} else {
+		p.syntaxError("expected IN, FROM, or DEFAULT in partition bound")
+	}
+
+	return spec
 }
 
 // parseTableElementList parses a comma-separated list of column defs and table constraints.

@@ -42,6 +42,12 @@ func deparseNode(b *strings.Builder, node Node) {
 		deparseIndexStmt(b, n)
 	case *ExplainStmt:
 		deparseExplainStmt(b, n)
+	case *ClusterStmt:
+		deparseClusterStmt(b, n)
+	case *PartitionBoundSpec:
+		deparsePartitionBoundSpec(b, n)
+	case *PartitionCmd:
+		deparsePartitionCmd(b, n)
 	case *ColumnDef:
 		deparseColumnDef(b, n)
 	case *RangeVar:

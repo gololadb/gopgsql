@@ -499,6 +499,18 @@ func deparseCreateTable(b *strings.Builder, cs *CreateStmt) {
 		b.WriteString("IF NOT EXISTS ")
 	}
 	deparseRangeVar(b, cs.Relation)
+
+	// PARTITION OF parent FOR VALUES ...
+	if cs.PartitionOf != nil {
+		b.WriteString(" PARTITION OF ")
+		deparseRangeVar(b, cs.PartitionOf)
+		if cs.PartBound != nil {
+			b.WriteString(" ")
+			deparsePartitionBoundSpec(b, cs.PartBound)
+		}
+		return
+	}
+
 	b.WriteString(" (")
 	for i, elt := range cs.TableElts {
 		if i > 0 {
@@ -519,6 +531,45 @@ func deparseCreateTable(b *strings.Builder, cs *CreateStmt) {
 	}
 	if cs.PartitionSpec != nil {
 		deparsePartitionSpec(b, cs.PartitionSpec)
+	}
+}
+
+func deparsePartitionBoundSpec(b *strings.Builder, ps *PartitionBoundSpec) {
+	if ps.IsDefault {
+		b.WriteString("DEFAULT")
+		return
+	}
+	b.WriteString("FOR VALUES ")
+	if ps.Strategy == "list" {
+		b.WriteString("IN (")
+		deparseExprList(b, ps.ListValues)
+		b.WriteString(")")
+	} else {
+		b.WriteString("FROM (")
+		deparseExprList(b, ps.LowerBound)
+		b.WriteString(") TO (")
+		deparseExprList(b, ps.UpperBound)
+		b.WriteString(")")
+	}
+}
+
+func deparsePartitionCmd(b *strings.Builder, pc *PartitionCmd) {
+	deparseRangeVar(b, pc.Name)
+	if pc.Bound != nil {
+		b.WriteString(" ")
+		deparsePartitionBoundSpec(b, pc.Bound)
+	}
+}
+
+func deparseClusterStmt(b *strings.Builder, cs *ClusterStmt) {
+	b.WriteString("CLUSTER")
+	if cs.Relation != nil {
+		b.WriteString(" ")
+		deparseRangeVar(b, cs.Relation)
+		if cs.IndexName != "" {
+			b.WriteString(" USING ")
+			b.WriteString(cs.IndexName)
+		}
 	}
 }
 

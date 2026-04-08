@@ -506,11 +506,56 @@ func (p *Parser) parseAlterTableCmd() *AlterTableCmd {
 		p.wantKeyword("level")
 		p.wantKeyword("security")
 		return &AlterTableCmd{baseNode: baseNode{pos}, Subtype: AT_ForceRowSecurity}
+
+	case p.isKeyword("attach"):
+		p.next()
+		p.wantKeyword("partition")
+		child := p.parseRangeVar()
+		bound := p.parsePartitionBoundSpec()
+		return &AlterTableCmd{baseNode: baseNode{pos}, Subtype: AT_AttachPartition,
+			Def: &PartitionCmd{baseNode: baseNode{pos}, Name: child, Bound: bound}}
+
+	case p.isKeyword("detach"):
+		p.next()
+		p.wantKeyword("partition")
+		child := p.parseRangeVar()
+		return &AlterTableCmd{baseNode: baseNode{pos}, Subtype: AT_DetachPartition,
+			Def: &PartitionCmd{baseNode: baseNode{pos}, Name: child}}
 	}
 
-	p.syntaxError("expected ADD, DROP, ALTER, SET, ENABLE, DISABLE, VALIDATE, CLUSTER, INHERIT, OWNER, REPLICA, or FORCE in ALTER TABLE command")
+	p.syntaxError("expected ADD, DROP, ALTER, SET, ENABLE, DISABLE, VALIDATE, CLUSTER, INHERIT, OWNER, REPLICA, FORCE, ATTACH, or DETACH in ALTER TABLE command")
 	p.next()
 	return &AlterTableCmd{baseNode: baseNode{pos}}
+}
+
+// ---------------------------------------------------------------------------
+// CLUSTER
+// ---------------------------------------------------------------------------
+
+// parseClusterStmt parses CLUSTER [table_name [USING index_name]].
+func (p *Parser) parseClusterStmt() *ClusterStmt {
+	p.wantKeyword("cluster")
+	stmt := &ClusterStmt{baseStmt: baseStmt{baseNode{p.pos}}}
+
+	// CLUSTER with no arguments (re-cluster all).
+	if p.tok == Token(';') || p.tok == EOF {
+		return stmt
+	}
+
+	// Optional VERBOSE (ignore).
+	p.gotKeyword("verbose")
+
+	// Table name.
+	if p.tok == IDENT || p.tok == KEYWORD {
+		stmt.Relation = p.parseRangeVar()
+	}
+
+	// USING index_name
+	if p.gotKeyword("using") {
+		stmt.IndexName = p.colId()
+	}
+
+	return stmt
 }
 
 // ---------------------------------------------------------------------------
